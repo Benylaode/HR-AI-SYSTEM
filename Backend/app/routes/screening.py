@@ -3,6 +3,7 @@ import uuid
 import json
 import re
 from datetime import datetime
+from flask_jwt_extended import get_jwt, get_jwt_identity, verify_jwt_in_request
 import numpy as np
 import faiss
 from flask import Blueprint, request, jsonify
@@ -35,6 +36,29 @@ client = OpenAI(
 )
 
 screening_bp = Blueprint("screening", __name__)
+@screening_bp.before_request
+def restrict_access_by_role():
+    if request.method == "OPTIONS":
+        return
+
+    verify_jwt_in_request()
+
+    claims = get_jwt()
+    role = claims.get("role")
+
+    # GET boleh HR & SUPER_USER
+    if request.method == "GET":
+        if role in ["HR", "SUPER_USER"]:
+            return
+
+    # Selain GET hanya SUPER_USER
+    if role != "SUPER_USER":
+        return jsonify({
+            "status": 403,
+            "message": "Access denied"
+        }), 403
+
+
 
 
 def job_to_text(job: JobPosition) -> str:

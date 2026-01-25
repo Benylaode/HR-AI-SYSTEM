@@ -1,4 +1,6 @@
 from flask import Blueprint, request, jsonify
+from flask_jwt_extended import get_jwt, get_jwt_identity, verify_jwt_in_request
+from flask_jwt_extended import get_jwt
 from sqlalchemy.exc import IntegrityError
 from app import db
 from app.models import Candidate, JobApplication
@@ -6,7 +8,28 @@ from datetime import datetime
 
 candidates_bp = Blueprint("candidates", __name__, url_prefix="/candidates")
 
+@candidates_bp.before_request
+def restrict_access_by_role():
+    if request.method == "OPTIONS":
+        return
 
+    verify_jwt_in_request()
+
+    claims = get_jwt()
+    role = claims.get("role")
+
+    # GET boleh HR & SUPER_USER
+    if request.method == "GET":
+        if role in ["HR", "SUPER_USER"]:
+            return
+
+    # Selain GET hanya SUPER_USER
+    if role != "SUPER_USER":
+        return jsonify({
+            "status": 403,
+            "message": "Access denied"
+        }), 403
+    
 def candidate_to_dict(candidate: Candidate):
     """
     Mengubah object Candidate menjadi dictionary.
